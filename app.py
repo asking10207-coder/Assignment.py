@@ -4,6 +4,9 @@ import joblib
 
 logistic_model = joblib.load("telco_churn_model.pkl")
 
+churn_model = joblib.load("telco_churn_model.pkl")
+revenue_model = joblib.load("telco_revenue_model.pkl")
+
 st.title("TELCO Ltd. Customer Churn Prediction")
 st.subheader("AI-Based Managerial Decision Support Tool")
 
