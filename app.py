@@ -2,55 +2,97 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-logistic_model = joblib.load("telco_churn_model.pkl")
+# Set application layout
+st.set_page_config(
+    page_title="Customer Churn & Monthly Charges Predictor",
+    layout="wide"
+)
 
-churn_model = joblib.load("telco_churn_model.pkl")
-revenue_model = joblib.load("telco_revenue_model.pkl")
+# ---------------------------------------------------------
+# 1. Load Trained Pipeline Models
+# ---------------------------------------------------------
+@st.cache_resource
+def load_models():
+    # Ensure both .pkl files are placed in the same folder as this script
+    churn = joblib.load("telco_churn_model.pkl")
+    revenue = joblib.load("telco_revenue_model.pkl")
+    return churn, revenue
 
-st.title("TELCO Ltd. Customer Churn Prediction")
-st.subheader("AI-Based Managerial Decision Support Tool")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("### Demographic & Account")
-    gender = st.selectbox("Gender", ["Male", "Female"])
-    senior = st.selectbox("Senior Citizen", [0, 1])
-    partner = st.selectbox("Partner", ["Yes", "No"])
-    dependents = st.selectbox("Dependents", ["Yes", "No"])
-    tenure = st.number_input("Tenure (months)", min_value=0, max_value=100, value=12)
-    contract = st.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
-    paperless = st.selectbox("Paperless Billing", ["Yes", "No"])
-    payment_method = st.selectbox(
-        "Payment Method",
-        [
-            "Electronic check",
-            "Mailed check",
-            "Bank transfer (automatic)",
-            "Credit card (automatic)"
-        ]
+try:
+    churn_model, revenue_model = load_models()
+except Exception as e:
+    st.error(
+        f"Error loading model files: {e}. "
+        "Please ensure 'telco_churn_model.pkl' and 'telco_revenue_model.pkl' "
+        "are uploaded to your repository."
     )
-    monthly_charges = st.number_input("Monthly Charges", min_value=0.0, value=50.0)
-    total_charges = st.number_input("Total Charges", min_value=0.0, value=600.0)
+    st.stop()
 
-with col2:
-    st.markdown("### Services Subscribed")
-    phone_service = st.selectbox("Phone Service", ["Yes", "No"])
-    multiple_lines = st.selectbox("Multiple Lines", ["No phone service", "No", "Yes"])
-    internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
-    online_security = st.selectbox("Online Security", ["No internet service", "No", "Yes"])
-    online_backup = st.selectbox("Online Backup", ["No internet service", "No", "Yes"])
-    device_protection = st.selectbox("Device Protection", ["No internet service", "No", "Yes"])
-    tech_support = st.selectbox("Tech Support", ["No internet service", "No", "Yes"])
-    streaming_tv = st.selectbox("Streaming TV", ["No internet service", "No", "Yes"])
-    streaming_movies = st.selectbox("Streaming Movies", ["No internet service", "No", "Yes"])
+# ---------------------------------------------------------
+# 2. User Interface Header
+# ---------------------------------------------------------
+st.title("Telco Customer Churn & Revenue Estimator")
+st.markdown(
+    "Provide the customer details below to estimate their **Monthly Charges** "
+    "and determine their **Risk of Churn**."
+)
 
-st.markdown("---")
+# ---------------------------------------------------------
+# 3. Input Form for Customer Characteristics
+# ---------------------------------------------------------
+with st.form("customer_input_form"):
+    col1, col2, col3 = st.columns(3)
 
-if st.button("Predict Churn"):
-    input_data = pd.DataFrame([{
+    with col1:
+        st.subheader("Demographics")
+        gender = st.selectbox("Gender", ["Female", "Male"])
+        senior_citizen = st.selectbox("Senior Citizen", [0, 1], format_func=lambda x: "Yes" if x == 1 else "No")
+        partner = st.selectbox("Partner", ["Yes", "No"])
+        dependents = st.selectbox("Dependents", ["Yes", "No"])
+
+        st.subheader("Tenure & Financials")
+        tenure = st.number_input("Tenure (in months)", min_value=0, max_value=72, value=12, step=1)
+        total_charges = st.number_input("Total Charges ($)", min_value=0.0, max_value=10000.0, value=600.0, step=10.0)
+
+    with col2:
+        st.subheader("Phone & Internet")
+        phone_service = st.selectbox("Phone Service", ["Yes", "No"])
+        multiple_lines = st.selectbox(
+            "Multiple Lines",
+            ["No", "Yes", "No phone service"] if phone_service == "No" else ["No", "Yes"]
+        )
+        internet_service = st.selectbox("Internet Service", ["DSL", "Fiber optic", "No"])
+        online_security = st.selectbox("Online Security", ["No", "Yes", "No internet service"])
+        online_backup = st.selectbox("Online Backup", ["No", "Yes", "No internet service"])
+        device_protection = st.selectbox("Device Protection", ["No", "Yes", "No internet service"])
+
+    with col3:
+        st.subheader("Streaming & Account")
+        tech_support = st.selectbox("Tech Support", ["No", "Yes", "No internet service"])
+        streaming_tv = st.selectbox("Streaming TV", ["No", "Yes", "No internet service"])
+        streaming_movies = st.selectbox("Streaming Movies", ["No", "Yes", "No internet service"])
+        contract = st.selectbox("Contract", ["Month-to-month", "One year", "Two year"])
+        paperless_billing = st.selectbox("Paperless Billing", ["Yes", "No"])
+        payment_method = st.selectbox(
+            "Payment Method",
+            [
+                "Electronic check",
+                "Mailed check",
+                "Bank transfer (automatic)",
+                "Credit card (automatic)"
+            ]
+        )
+
+    submit_button = st.form_submit_button("Calculate & Predict")
+
+# ---------------------------------------------------------
+# 4. Prediction Execution
+# ---------------------------------------------------------
+if submit_button:
+    # 4A. Build record for revenue prediction (MonthlyCharges excluded)
+    revenue_input = {
         "gender": gender,
-        "SeniorCitizen": senior,
+        "SeniorCitizen": senior_citizen,
         "Partner": partner,
         "Dependents": dependents,
         "tenure": tenure,
@@ -64,25 +106,45 @@ if st.button("Predict Churn"):
         "StreamingTV": streaming_tv,
         "StreamingMovies": streaming_movies,
         "Contract": contract,
-        "PaperlessBilling": paperless,
+        "PaperlessBilling": paperless_billing,
         "PaymentMethod": payment_method,
-        "MonthlyCharges": monthly_charges,
-        "TotalCharges": total_charges
-    }])
+        "TotalCharges": total_charges,
+    }
 
-    try:
-        prediction = logistic_model.predict(input_data)[0]
+    df_revenue = pd.DataFrame([revenue_input])
 
-        if hasattr(logistic_model, "predict_proba"):
-            churn_prob = logistic_model.predict_proba(input_data)[0][1]
-            prob_text = f" (Churn Probability: {churn_prob:.1%})"
-        else:
-            prob_text = ""
+    # 4B. Predict Monthly Charges using linear regression model
+    predicted_monthly_charges = float(revenue_model.predict(df_revenue)[0])
 
-        if prediction == 1 or prediction == "Yes":
-            st.error(f"⚠️ High Risk: Customer is likely to churn!{prob_text}")
-        else:
-            st.success(f"✅ Low Risk: Customer is likely to stay.{prob_text}")
+    # 4C. Insert estimated charges for churn classification
+    df_churn = df_revenue.copy()
+    df_churn["MonthlyCharges"] = predicted_monthly_charges
 
-    except Exception as e:
-        st.error(f"Prediction error: {e}")
+    # 4D. Predict Churn outcome and likelihood using logistic regression model
+    churn_class = int(churn_model.predict(df_churn)[0])
+    churn_probability = float(churn_model.predict_proba(df_churn)[0][1])
+
+    # ---------------------------------------------------------
+    # 5. Display Outputs
+    # ---------------------------------------------------------
+    st.divider()
+    st.subheader("Model Predictions")
+
+    metric_col1, metric_col2 = st.columns(2)
+
+    with metric_col1:
+        st.metric(
+            label="Estimated Monthly Charges",
+            value=f"${predicted_monthly_charges:.2f}"
+        )
+
+    with metric_col2:
+        st.metric(
+            label="Churn Probability",
+            value=f"{churn_probability * 100:.1f}%"
+        )
+
+    if churn_class == 1:
+        st.error("High Risk: This customer is predicted to churn.")
+    else:
+        st.success("Low Risk: This customer is likely to remain with the service.")
