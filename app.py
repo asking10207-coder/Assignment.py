@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import joblib
 
-logistic_model = joblib.load("abc_churn_model.pkl")
+logistic_model = joblib.load("telco_churn_model.pkl")
 
-st.title("ABC Ltd. Customer Churn Prediction")
+st.title("TELCO Ltd. Customer Churn Prediction")
 st.subheader("AI-Based Managerial Decision Support Tool")
 
 col1, col2 = st.columns(2)
